@@ -1,0 +1,50 @@
+# Fork-only: builds the Windows app from this branch to test
+# fix/windows-oauth-loopback. Not meant for upstream.
+name: Windows test build
+
+on:
+  push:
+    branches: [ci/windows-test-build]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@v2.23.0
+        with:
+          channel: "stable"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - run: flutter pub get
+
+      - name: analyze changed file
+        run: flutter analyze lib/services/external_browser.dart
+
+      - name: sync oauth callback test
+        run: flutter test test/services/sync_oauth_callback_test.dart
+
+      - name: build windows app
+        run: flutter build windows --release
+
+      - name: zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "dist/Mangayomi-winfix-windows.zip" -Force
+
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: Mangayomi-winfix-windows-zip
+          path: dist/Mangayomi-winfix-windows.zip
+          if-no-files-found: error
