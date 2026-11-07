@@ -163,20 +163,21 @@ class ExternalBrowser {
     required int port,
     required String callbackUrlScheme,
   }) {
-    if (Platform.isLinux) return _openOAuthLinux(authUrl, port: port);
-    // TODO(platforms): implement the macOS and Windows chosen-browser login.
-    if (Platform.isMacOS) {
-      return _openOAuthDefault(authUrl, callbackUrlScheme: callbackUrlScheme);
+    // Windows must not use flutter_web_auth_2's default webview: it matches
+    // the callback by comparing uri.scheme ("http") against the whole
+    // "http://localhost:<port>", never intercepts the redirect, and the login
+    // ends in ERR_CONNECTION_REFUSED (#1135).
+    if (Platform.isLinux || Platform.isWindows) {
+      return _openOAuthLoopback(authUrl, port: port);
     }
-    if (Platform.isWindows) {
-      return _openOAuthDefault(authUrl, callbackUrlScheme: callbackUrlScheme);
-    }
+    // TODO(platforms): implement the macOS chosen-browser login.
     return _openOAuthDefault(authUrl, callbackUrlScheme: callbackUrlScheme);
   }
 
-  /// Linux: open the authorize page in the chosen browser and catch the
-  /// redirect on a local loopback server bound to [port].
-  static Future<Uri?> _openOAuthLinux(
+  /// Linux and Windows: open the authorize page in the browser (the chosen one
+  /// on Linux, the system default on Windows) and catch the redirect on a
+  /// local loopback server bound to [port].
+  static Future<Uri?> _openOAuthLoopback(
     String authUrl, {
     required int port,
   }) async {
@@ -220,7 +221,7 @@ class ExternalBrowser {
     }
   }
 
-  /// The original `flutter_web_auth_2` flow (mobile, and macOS/Windows until
+  /// The original `flutter_web_auth_2` flow (mobile, and macOS until
   /// implemented).
   static Future<Uri?> _openOAuthDefault(
     String authUrl, {
